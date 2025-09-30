@@ -66,3 +66,18 @@ logs/
 # 测试文件
 test_*.py
 *_test.py
+
+# 构建文件和可执行文件
+build/
+dist/
+*.exe
+*.spec
+
+# 临时构建脚本（已合并到tools/）
+build_executable.py
+create_exe_portable.py  
+create_simple_portable.py
+可执行版本说明.md
+
+# 大型依赖文件（保留在Release中）
+MRIcroGL_windows.zip

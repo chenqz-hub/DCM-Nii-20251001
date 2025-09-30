@@ -1,0 +1,30 @@
+# DCM-Nii 便携版使用说明
+
+## 环境要求
+- Python 3.7+ 
+- 必需的库：pydicom, nibabel, numpy, tkinter
+
+## 使用步骤
+1. 首次使用：双击 "1-安装依赖.bat" 安装Python库
+2. 图形界面：双击 "2-启动图形界面.bat"  
+3. 命令行：双击 "3-命令行处理.bat"
+
+## 目录说明
+- scripts/        # Python脚本
+- tools/          # dcm2niix转换工具
+- data/           # 可放置DICOM数据
+- output/         # 处理结果输出
+- docs/           # 详细文档
+
+## 功能特性
+- 批量DICOM转NIfTI
+- 支持ZIP文件自动解压
+- 完整元数据导出（含脱敏版本）
+- 智能目录结构识别
+
+## 故障排除
+1. 如果提示缺少Python：请先安装Python 3.7+
+2. 如果提示缺少库：运行 "1-安装依赖.bat"
+3. 如果找不到dcm2niix：确认tools目录存在
+
+更多信息请参考docs目录中的详细文档。
