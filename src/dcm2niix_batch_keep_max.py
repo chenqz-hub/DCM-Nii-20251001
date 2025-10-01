@@ -31,7 +31,7 @@ else:
 if not os.path.exists(DCM2NIIX_PATH):
     DCM2NIIX_PATH = r"D:\git\DCM-Nii\dcm2niix.exe"
     if not os.path.exists(DCM2NIIX_PATH):
-        print("❌ 未找到 dcm2niix.exe，请确认工具路径")
+        print("[错误] 未找到 dcm2niix.exe，请确认工具路径")
         sys.exit(1)
 
 print(f"使用转换工具: {DCM2NIIX_PATH}")
@@ -120,10 +120,10 @@ def extract_zip_files(data_dir):
             try:
                 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                     zip_ref.extractall(extract_path)
-                    print(f"✅ 已解压: {os.path.basename(zip_path)} -> {zip_name}_extracted")
+                    print(f"[成功] 已解压: {os.path.basename(zip_path)} -> {zip_name}_extracted")
                     extracted_dirs.append((zip_name, extract_path))
             except Exception as e:
-                print(f"❌ 解压失败: {os.path.basename(zip_path)}, 错误: {e}")
+                print(f"[错误] 解压失败: {os.path.basename(zip_path)}, 错误: {e}")
     
     return extracted_dirs
 
@@ -244,14 +244,14 @@ for case_name, case_path in cases:
             # 检查关键字段是否有效
             critical_fields_ok = bool(row['PatientID'] or row['Modality'] or row['StudyInstanceUID'])
             if critical_fields_ok:
-                print(f"   ✅ 成功提取元数据: PatientID={row['PatientID']}, Modality={row['Modality']}")
+                print(f"   [成功] 成功提取元数据: PatientID={row['PatientID']}, Modality={row['Modality']}")
                 metadata_extracted = True
                 break
             else:
                 print(f"   ⚠️ 关键元数据字段为空，尝试下一个文件...")
                 
         except Exception as e:
-            print(f"   ❌ 元数据提取失败: {e}")
+            print(f"   [错误] 元数据提取失败: {e}")
             continue
     
     if metadata_extracted and row:
@@ -294,18 +294,18 @@ for case_name, case_path in cases:
                 print(f"   标准输出: {result.stdout.strip()}")
             
             if result.returncode != 0:
-                print(f"   ❌ 转换失败，返回码: {result.returncode}")
+                print(f"   [错误] 转换失败，返回码: {result.returncode}")
                 if result.stderr:
                     print(f"   错误信息: {result.stderr.strip()}")
                 continue
             else:
-                print(f"   ✅ 转换成功")
+                print(f"   [成功] 转换成功")
                 
         except subprocess.TimeoutExpired:
             print(f"   ⏰ 转换超时（{timeout_minutes}分钟），跳过此case")
             continue
         except Exception as e:
-            print(f"   ❌ 转换异常: {e}")
+            print(f"   [错误] 转换异常: {e}")
             continue
         
         # 删除JSON文件
@@ -354,7 +354,7 @@ if metadata_rows:
         writer.writerow(['ProjectID'] + FIELDS)
         for row in metadata_rows:
             writer.writerow([row[field] for field in ['ProjectID'] + FIELDS])
-    print(f"✅ 已生成: {META_CSV}")
+    print(f"[成功] 已生成: {META_CSV}")
     
     # 脱敏元数据CSV
     with open(MASKED_CSV, 'w', newline='', encoding='utf-8-sig') as f:
@@ -362,9 +362,9 @@ if metadata_rows:
         writer.writerow(['ProjectID'] + FIELDS)
         for row in masked_rows:
             writer.writerow([row[field] for field in ['ProjectID'] + FIELDS])
-    print(f"✅ 已生成: {MASKED_CSV}")
+    print(f"[成功] 已生成: {MASKED_CSV}")
     
-    print(f"\n🎉 全部完成！")
+    print(f"\n[完成] 全部完成！")
     print(f"   成功处理: {processed_count} 个case")
     print(f"   输出目录: {OUTPUT_DIR}")
 else:

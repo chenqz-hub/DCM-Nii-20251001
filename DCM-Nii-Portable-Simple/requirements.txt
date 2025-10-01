@@ -1,3 +1,0 @@
-pydicom
-nibabel
-numpy

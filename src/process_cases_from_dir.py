@@ -2,7 +2,6 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import subprocess
-import zipfile
 
 def main():
     print("=== DCM-Nii 批量处理工具 ===")
@@ -23,6 +22,7 @@ def main():
     if not selected_dir:
         print("未选择目录，程序退出。")
         messagebox.showwarning("提示", "未选择目录，程序将退出")
+        root.destroy()
         return
     
     print(f"已选择目录: {selected_dir}")
@@ -34,6 +34,7 @@ def main():
     if not case_dirs:
         print("所选目录下未发现子文件夹，请确认目录结构")
         messagebox.showerror("错误", "所选目录下未发现子文件夹\n请确认目录包含各个case的子文件夹")
+        root.destroy()
         return
     
     # 检查是否有ZIP文件需要处理
@@ -54,8 +55,6 @@ def main():
         cmd = ['python', 'dcm2niix_batch_keep_max.py', selected_dir]
         result = subprocess.run(cmd, cwd=os.path.dirname(__file__), 
                               capture_output=True, text=True)
-        
-        # dcm2niix_batch_keep_max.py 已经集成了元数据生成功能，无需重复调用
         
         print("=== 批处理输出 ===")
         if result.stdout:
