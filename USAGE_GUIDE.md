@@ -14,30 +14,38 @@ python --version  # 应显示 Python 3.8+
 
 ### 第二步：准备数据
 ```bash
-# 1. 将DICOM ZIP文件放入数据目录
-# 目标目录：D:\git\DCM-Nii-20251001\data\Downloads20251005\
+# 1. 将DICOM ZIP文件放入任意目录
+# 示例目录：D:\医学数据\2024年10月\
 # 
 # 支持的文件格式：
 # ✅ dicom_*.zip
 # ✅ *.zip (包含DICOM文件)
 ```
 
-### 第三步：运行转换
+### 第三步：运行转换（推荐GUI方式）
 ```bash
-# 一键智能转换（推荐）
-python src\dcm2niix_smart_convert.py
+# 一键智能转换 - 弹窗选择目录（推荐）
+python src\dcm2niix_batch_convert_anywhere.py
+
+# 或指定目录路径
+python src\dcm2niix_batch_convert_anywhere.py "D:\医学数据\2024年10月"
 ```
 
 ### 第四步：查看结果
 ```bash
-# 结果位置：D:\git\DCM-Nii-20251001\output\nifti_files\
+# 结果位置：选择目录的output子文件夹
+# 例如：D:\医学数据\2024年10月\output\
 # 
 # 输出文件说明：
-# ├── *.nii.gz                          # NIfTI影像文件
-# ├── *.json                            # JSON元数据文件
-# ├── json_metadata_summary_*.csv       # 完整元数据(38字段)
-# ├── clinical_info_*.csv               # 临床信息(7字段)
-# └── smart_conversion_report_*.json    # 处理报告
+# ├── dicom_案例1/
+# │   ├── *.nii.gz                      # NIfTI影像文件
+# │   └── *.json                        # JSON元数据文件
+# ├── dicom_案例2/
+# │   ├── *.nii.gz                      
+# │   └── *.json                        
+# ├── unified_metadata_summary_*.csv    # 完整元数据汇总(38字段)
+# ├── unified_clinical_info_*.csv       # 临床信息汇总(7字段)
+# └── conversion_report_*.json          # 处理报告
 ```
 
 ---
@@ -82,11 +90,16 @@ python -c "import os; print('dcm2niix存在' if os.path.exists('dcm2niix.exe') e
 
 #### 步骤1：准备DICOM文件
 ```
-数据目录结构：
-D:\git\DCM-Nii-20251001\data\Downloads20251005\
+数据可以放在任意目录：
+例如：D:\医学数据\2024年10月\
 ├── dicom_5434779.zip     # 案例1
 ├── dicom_6499278.zip     # 案例2
 ├── dicom_*.zip           # 更多案例...
+└── ...
+
+或者：C:\Users\用户名\Desktop\DICOM数据\
+├── patient001.zip
+├── patient002.zip
 └── ...
 
 支持的文件：
@@ -97,27 +110,30 @@ D:\git\DCM-Nii-20251001\data\Downloads20251005\
 
 #### 步骤2：检查数据文件（可选）
 ```powershell
-# 查看数据目录中的ZIP文件
-ls "data\Downloads20251005\*.zip" | Measure-Object | Select-Object Count
+# 查看任意目录中的ZIP文件，例如：
+ls "D:\医学数据\2024年10月\*.zip" | Measure-Object | Select-Object Count
 
 # 显示前几个文件名
-ls "data\Downloads20251005\*.zip" | Select-Object -First 5 Name
+ls "D:\医学数据\2024年10月\*.zip" | Select-Object -First 5 Name
 ```
 
 ### 🎯 执行转换
 
-#### 方法1：一键智能转换（推荐）
+#### 方法1：GUI弹窗选择（推荐）
 ```powershell
-# 完整流程：提取元数据 + 智能转换 + 生成摘要
-python src\dcm2niix_smart_convert.py
+# 运行脚本，自动弹出文件夹选择对话框
+python src\dcm2niix_batch_convert_anywhere.py
 ```
 
-#### 方法2：分步骤执行（高级用户）
+#### 方法2：命令行指定目录
 ```powershell
-# 仅提取原始DICOM元数据
-python src\extract_case_metadata.py
+# 直接指定包含ZIP文件的目录
+python src\dcm2niix_batch_convert_anywhere.py "D:\医学数据\2024年10月"
+```
 
-# 然后运行智能转换
+#### 方法3：项目固定目录（传统方式）
+```powershell
+# 使用项目内固定目录结构的脚本
 python src\dcm2niix_smart_convert.py
 ```
 
@@ -125,27 +141,29 @@ python src\dcm2niix_smart_convert.py
 
 #### 步骤1：查看处理结果
 ```powershell
-# 查看输出目录
-ls "output\nifti_files\"
+# 查看输出目录（假设你选择了 D:\医学数据\2024年10月）
+ls "D:\医学数据\2024年10月\output\"
 
 # 统计生成的文件数量
-$nii = (ls "output\nifti_files\*.nii.gz").Count
-$json = (ls "output\nifti_files\*.json" | Where-Object {$_.Name -notlike "smart_*"}).Count
-$csv = (ls "output\nifti_files\*.csv").Count
-Write-Host "NIfTI文件: $nii 个, JSON文件: $json 个, CSV文件: $csv 个"
+$outputDir = "D:\医学数据\2024年10月\output"
+$nii = (ls "$outputDir\*\*.nii.gz").Count
+$json = (ls "$outputDir\*\*.json").Count
+$csv = (ls "$outputDir\*.csv").Count
+Write-Host "NIfTI文件: $nii 个, JSON文件: $json 个, 汇总CSV: $csv 个"
 ```
 
 #### 步骤2：检查处理报告
 ```powershell
 # 查看最新的处理报告
-$report = ls "output\nifti_files\smart_conversion_report_*.json" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$outputDir = "D:\医学数据\2024年10月\output"
+$report = ls "$outputDir\conversion_report_*.json" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 Write-Host "最新报告: $($report.Name)"
 
 # 快速查看成功率（需要Python）
 python -c "
 import json
 import glob
-reports = glob.glob('output/nifti_files/smart_conversion_report_*.json')
+reports = glob.glob('D:/医学数据/2024年10月/output/conversion_report_*.json')
 if reports:
     with open(max(reports), 'r', encoding='utf-8') as f:
         data = json.load(f)

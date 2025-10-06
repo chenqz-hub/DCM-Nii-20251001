@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DICOM元数据提取脚本
+DICOM元数据提取脚本（支持命令行参数）
 从ZIP压缩包中的DICOM文件提取关键信息
 """
 
@@ -20,14 +20,22 @@ def convert_dicom_value(value):
     """
     转换DICOM值为JSON可序列化的格式
     """
+    if value is None:
+        return 'Unknown'
+    
+    # 特殊处理DICOM PersonName类型
+    if hasattr(value, 'family_name') or hasattr(value, 'given_name'):
+        # 这是PersonName类型，直接转换为字符串
+        return str(value)
+    
+    # 处理MultiValue或其他可迭代类型（但不包括字符串）
     if hasattr(value, '__iter__') and not isinstance(value, (str, bytes)):
-        # MultiValue或列表类型
         try:
             return [str(v) for v in value]
         except:
             return str(value)
     else:
-        return str(value) if value is not None else 'Unknown'
+        return str(value)
 
 def extract_dicom_metadata(dicom_path):
     """
@@ -109,18 +117,27 @@ def process_zip_file(zip_path, temp_dir):
 def main():
     """主函数"""
     # 设置路径
-    base_dir = Path(__file__).parent.parent
-    data_dir = base_dir / "data" / "Downloads20251005"
-    output_dir = base_dir / "output"
+    if len(sys.argv) > 1:
+        # 使用命令行参数指定的目录
+        data_dir = Path(sys.argv[1])
+        output_dir = data_dir / "output"
+        print(f"Using data directory: {data_dir}")
+    else:
+        # 默认使用项目目录
+        base_dir = Path(__file__).parent.parent
+        data_dir = base_dir / "data" / "Downloads20251005"
+        output_dir = base_dir / "output"
+        print(f"Using default data directory: {data_dir}")
     
     # 创建输出目录
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(exist_ok=True, parents=True)
     
     # 获取所有ZIP文件
     zip_files = list(data_dir.glob("*.zip"))
     
     if not zip_files:
-        print("No ZIP files found in the data directory")
+        print(f"No ZIP files found in the data directory: {data_dir}")
+        print(f"Available files: {list(data_dir.glob('*'))}")
         return
     
     print(f"Found {len(zip_files)} ZIP files to process")
@@ -138,11 +155,11 @@ def main():
         if all_metadata:
             # 保存为CSV
             df = pd.DataFrame(all_metadata)
-            csv_path = output_dir / f"dicom_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            csv_path = output_dir / f"case_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
             df.to_csv(csv_path, index=False, encoding='utf-8-sig')
             
             # 保存为JSON
-            json_path = output_dir / f"dicom_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            json_path = output_dir / f"case_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(all_metadata, f, ensure_ascii=False, indent=2)
             

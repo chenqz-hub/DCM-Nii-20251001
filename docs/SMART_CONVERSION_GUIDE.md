@@ -1,12 +1,14 @@
 # DICOM智能转换脚本使用指南
 
-## 🌟 推荐脚本：`dcm2niix_smart_convert.py`
+## 🌟 主推脚本：`dcm2niix_batch_convert_anywhere.py`
 
 ### ✨ 核心优势
+- **📂 任意目录处理**：无需迁移文件，直接在源目录处理
 - **🧠 智能分析**：自动识别最佳影像序列
-- **⚡ 高效处理**：速度提升4倍（29分40秒 → 7分20秒）
-- **🎯 精准输出**：每案例1个NIfTI文件
-- **💾 节省空间**：磁盘使用减少50%
+- **🖱️ 用户友好**：支持弹窗选择目录或命令行参数
+- **📊 完整元数据**：自动提取DICOM原始信息并整合
+- **⚡ 高效处理**：速度提升4倍，只转换主要序列
+- **💾 分布存储**：结果保存在源目录，便于管理
 
 ### 🔧 智能选择算法
 脚本使用多维评分系统选择最佳序列：
@@ -29,75 +31,103 @@
 
 ### 🚀 使用步骤
 
-1. **运行脚本**：
-   ```bash
-   python src/dcm2niix_smart_convert.py
-   ```
+#### 方式一：弹窗选择目录（推荐）
+```bash
+python src/dcm2niix_batch_convert_anywhere.py
+```
+会弹出文件夹选择对话框，选择包含ZIP文件的目录即可。
 
-2. **观察输出**：
-   ```
-   [1/42] Processing dicom_6499278...
-     📊 Analyzing DICOM series...
-     🎯 Selected: Series 201 - 5.0 x 5.0 (66 files)
-     🔄 Converting main series...
-     ✅ Success: Generated 1 NIfTI files
-   ```
+#### 方式二：命令行指定目录
+```bash
+python src/dcm2niix_batch_convert_anywhere.py "C:/path/to/your/zip/files"
+```
 
-3. **查看结果**：
-   - 输出目录：`output/nifti_converted_smart/`
-   - 每案例：1个 `.nii.gz` + 1个 `.json` 文件
-   - 转换报告：`smart_conversion_report_日期时间.json`
+### 📋 处理流程
+```
+Step 1: Extracting DICOM metadata from ZIP files...
+✓ DICOM metadata extraction completed
+
+Step 2: 批量转换所有ZIP文件
+[1/4] Processing dicom_5844442.zip...
+  Analyzing DICOM series...
+  Selected: Series 1 - Chest (365 files)
+  Converting main series...
+  ✓ Output saved to: C:\Users\...\Desktop\try\output
+
+Step 3: Generating unified metadata summary...
+✓ Complete metadata: unified_metadata_summary_xxx.csv
+✓ Clinical summary: unified_clinical_info_xxx.csv
+✓ Detailed report: conversion_report_xxx.json
+
+✅ Processing complete!
+```
 
 ### 📁 输出结构
+
+现在每个ZIP文件的结果都保存在**源目录的output子文件夹**中，同时生成统一的汇总文件：
+
 ```
-output/nifti_converted_smart/
-├── dicom_6499278/
-│   ├── 1899967_201_Chest_Helical.nii.gz
-│   └── 1899967_201_Chest_Helical.json
-├── dicom_6567397/
-│   ├── 3677701_201_JY_Chest_Thorax.nii.gz
-│   └── 3677701_201_JY_Chest_Thorax.json
-└── smart_conversion_report_20251006_104520.json
+your-selected-directory/
+├── dicom_6499278.zip
+├── dicom_6567397.zip
+├── output/                                    # ← 统一汇总目录
+│   ├── dicom_6499278/
+│   │   ├── 1899967_201_Chest_Helical.nii.gz
+│   │   └── 1899967_201_Chest_Helical.json
+│   ├── dicom_6567397/
+│   │   ├── 3677701_201_JY_Chest_Thorax.nii.gz
+│   │   └── 3677701_201_JY_Chest_Thorax.json
+│   ├── unified_metadata_summary_xxx.csv      # 完整元数据汇总
+│   ├── unified_clinical_info_xxx.csv         # 临床信息汇总
+│   └── conversion_report_xxx.json            # 详细转换报告
+└── temp_dicom_extraction/                     # 临时文件夹（自动清理）
 ```
 
-### 🔍 与传统方法对比
+### 🔍 功能特色对比
 
-| 特征 | 智能方法 | 传统方法 |
-|------|----------|----------|
-| **策略** | 分析→转换目标序列 | 转换全部→删除多余 |
-| **速度** | 7分20秒 | 29分40秒 |
-| **精度** | 多维评分选择 | 文件大小选择 |
-| **输出** | 1个目标文件 | 6-7个→筛选1个 |
-| **磁盘** | 4GB峰值 | 8-10GB峰值 |
+| 特征 | dcm2niix_batch_convert_anywhere.py | dcm2niix_smart_convert.py |
+|------|-------------------------------------|----------------------------|
+| **适用范围** | 任意目录，灵活处理 | 固定项目目录结构 |
+| **目录选择** | GUI弹窗 + 命令行 | 命令行参数 |
+| **输出位置** | 源目录/output + 汇总 | 项目/output目录 |
+| **元数据提取** | 集成完整功能 | 依赖外部脚本 |
+| **转换策略** | 智能评分选择主序列 | 智能评分选择主序列 |
+| **汇总功能** | 统一CSV + 详细报告 | 转换报告 |
+| **易用性** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 
 ### ⚠️ 注意事项
 
-1. **序列选择**：基于智能评分，可能与文件大小最大的不同
-2. **特殊案例**：如需查看所有序列，使用传统方法
-3. **定位像**：自动排除，如需要请使用传统方法
-4. **兼容性**：输出格式完全兼容医学影像分析工具
+1. **序列选择**：基于智能评分系统，自动选择最重要的主序列
+2. **输出位置**：结果保存在选择目录的`output`子文件夹中
+3. **临时文件**：处理过程中会创建临时解压文件夹，完成后自动清理
+4. **兼容性**：输出格式完全兼容所有医学影像分析工具
+5. **GUI依赖**：需要tkinter支持，如无图形界面请使用命令行参数
 
-### 🎯 适用场景
+### 🎯 脚本选择指南
 
-✅ **推荐使用智能方法**：
-- 批量处理大量案例
-- 只需要主要影像序列
-- 追求高效率处理
-- 标准临床研究分析
+#### ✅ 推荐使用 `dcm2niix_batch_convert_anywhere.py`（主推荐）：
+- **任意目录处理**：不限制文件夹结构
+- **GUI友好操作**：点击运行即可选择目录
+- **完整功能集成**：包含元数据提取和汇总
+- **灵活输出管理**：分布式存储 + 集中汇总
+- **适用场景**：日常使用、临时处理、数据交接
 
-⚠️ **考虑传统方法**：
-- 需要查看所有序列类型
-- 特殊研究需求（如定位像分析）
-- 手动质控每个序列
+#### 🔧 项目专用 `dcm2niix_smart_convert.py`：
+- **固定目录结构**：适合标准化项目
+- **轻量级处理**：专注转换功能
+- **集中式输出**：统一项目输出目录
+- **适用场景**：长期项目、规范化处理流程
 
 ### 📞 技术支持
 
-如遇问题，检查：
-1. `dcm2niix.exe` 是否存在
-2. Python环境是否配置
-3. 输入ZIP文件是否为有效DICOM
-4. 磁盘空间是否充足
+如遇问题，请检查：
+1. **工具可用性**：`dcm2niix.exe`是否存在并可执行
+2. **Python环境**：pandas, pydicom, nibabel是否已安装
+3. **文件格式**：输入ZIP文件是否包含有效DICOM数据
+4. **存储空间**：确保有足够磁盘空间处理临时文件
+5. **权限设置**：确保对目标目录有读写权限
 
 ---
-*创建时间：2025-10-06*
-*版本：智能转换 v1.0*
+*文档更新：2025-01-28*  
+*项目版本：DCM-Nii v2.0*  
+*主推荐脚本：dcm2niix_batch_convert_anywhere.py*
