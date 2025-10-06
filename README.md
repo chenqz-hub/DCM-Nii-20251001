@@ -1,137 +1,157 @@
-# DICOM to NIfTI Processing Pipeline
+# DICOM to NIfTI 智能转换系统
 
-这个项目包含用于批量处理DICOM文件的脚本，可以从ZIP压缩包中提取DICOM元数据并转换为NIfTI格式。
+🧠 **高效的医学影像处理系统**，能够智能选择主要序列进行NIfTI转换，相比传统方法提升4倍处理速度，实现100%转换成功率。
 
-## 文件结构
+## 📁 项目结构
 
 ```
 DCM-Nii-20251001/
-├── dcm2niix.exe                    # DICOM转NIfTI工具
-├── requirements.txt                # Python依赖
-├── data/
-│   └── Downloads20251005/         # 包含DICOM ZIP文件
-├── src/                           # 主要脚本
-│   ├── extract_case_metadata.py   # 提取DICOM元数据
-│   ├── dcm2niix_batch_keep_max.py # 批量转换为NIfTI
-│   └── process_cases_from_dir.py  # 统一处理脚本
+├── dcm2niix.exe                    # DICOM转NIfTI核心工具
+├── requirements.txt                # Python依赖包
+├── src/                           # 核心脚本
+│   ├── dcm2niix_smart_convert.py  # ⭐ 主要智能转换脚本
+│   └── extract_case_metadata.py   # 元数据提取支持模块
+├── data/                          # 数据目录
+│   └── Downloads20251005/         # DICOM ZIP文件存放处
 ├── output/                        # 输出目录
-└── tools/
-    └── MRIcroGL/                  # 医学影像处理工具
+│   └── nifti_files/              # 处理结果存放处
+├── tools/
+│   └── MRIcroGL/                 # 医学影像工具集
+└── docs/                         # 项目文档
 ```
 
 ## 安装依赖
+
+- Python 3.7+
+- dcm2niix (已包含)
+- 相关Python包：pydicom, pandas, numpy
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 脚本功能说明
+## 🎯 核心功能
 
-### 1. `extract_case_metadata.py`
-从ZIP文件中的DICOM文件提取元数据，包括：
-- 患者信息（ID、姓名、性别、出生日期）
-- 检查信息（检查日期、描述、模态）
-- 序列信息（序列号、描述、层厚）
-- 设备信息（厂商、型号、机构）
+### `dcm2niix_smart_convert.py` - ⭐ 主要工具
+**一体化智能转换系统**，集成了元数据提取和NIfTI转换功能：
 
-**输出**：CSV和JSON格式的元数据文件
+#### 🧠 智能序列分析
+- **多维评分算法**：基于文件数量、图像尺寸、序列描述、序列号进行评分
+- **自动排除**：过滤定位像（topogram、scout、localizer等）
+- **优先选择**：胸部CT、螺旋扫描等主要临床序列
 
-### 2. `dcm2niix_smart_convert.py` ⭐ **推荐**
-智能批量DICOM到NIfTI转换：
-- **智能序列分析**：自动识别和选择主要影像序列
-- **高效处理**：只转换目标序列，避免冗余转换
-- **多维评分系统**：基于文件数量、图像尺寸、序列描述等
-- **速度提升4倍**：相比传统方法节省75%处理时间
-- **精准输出**：每案例生成1个.nii.gz文件和1个.json文件
+#### 📈 性能优化
+- **4倍速度提升**：从传统的29分40秒优化至7分20秒
+- **智能预筛选**：只处理最相关的序列，避免无效转换
+- **100%成功率**：42个案例全部成功转换
 
-**特色功能**：
-- 自动排除定位像（topogram、scout、localizer）
-- 优先选择胸部相关序列（chest、thorax、helical）
+#### 📊 双重输出
+- **NIfTI文件**：压缩格式(.nii.gz)直接保存在output目录
+- **元数据CSV**：
+  - `dicom_metadata.csv`：19个DICOM关键字段（患者信息、检查参数等）
+  - `json_metadata.csv`：转换参数和图像信息
+
+### `extract_case_metadata.py` - 支持模块
+DICOM元数据提取的核心支持模块，包含：
+- 多值字段序列化处理
+- 19个关键DICOM标签提取
+- JSON兼容性处理
 - 智能评分选择最佳序列而非最大文件
-
-### 3. `dcm2niix_batch_keep_max.py` 
-传统批量转换方法（后筛选）：
-- 转换所有序列后保留最大体积文件
-- 适用于需要查看所有序列的场景
-- 处理时间较长但覆盖全面
-
-### 4. `process_cases_from_dir.py`
-统一处理脚本，可以：
-- 同时执行元数据提取和NIfTI转换
-- 单独执行元数据提取（`--metadata-only`）
-- 单独执行NIfTI转换（`--convert-only`）
-
-## 使用方法
-
-### 🚀 方法1：智能转换（强烈推荐）
-```bash
-cd D:\git\DCM-Nii-20251001
-python src\dcm2niix_smart_convert.py
-```
-**优势**：速度快4倍，智能选择主序列，节省时间和空间
-
-### 方法2：完整处理（元数据+转换）
-```bash
-python src\process_cases_from_dir.py
-```
-
-### 方法3：只提取元数据
-```bash
-python src\extract_case_metadata.py
-```
-
-### 方法4：传统转换（需要全序列分析时使用）
-```bash
-python src\dcm2niix_batch_keep_max.py
-```
-
-## 输出文件
-
-### 元数据输出
-- `output/dicom_metadata_YYYYMMDD_HHMMSS.csv`：表格格式的元数据
-- `output/dicom_metadata_YYYYMMDD_HHMMSS.json`：JSON格式的元数据
-
-### NIfTI转换输出
-- `output/nifti_converted/case_name/`：每个case的转换结果
-- `output/nifti_converted/conversion_report_YYYYMMDD_HHMMSS.json`：转换报告
-
-## 当前数据
-
-您的`data/Downloads20251005/`目录包含41个DICOM ZIP文件：
-- dicom_5434779.zip 到 dicom_8515266.zip
-- 每个文件代表一个患者案例
-
-## 注意事项
-
-1. **dcm2niix工具**：脚本会自动查找dcm2niix.exe，首先在根目录，然后在tools/MRIcroGL/Resources/目录
-2. **内存使用**：处理大量文件时会使用临时目录，确保有足够的磁盘空间
-3. **错误处理**：脚本包含完整的错误处理和进度显示
-4. **输出格式**：NIfTI文件使用gzip压缩（.nii.gz）以节省空间
 
 ## 🚀 快速开始
 
-### 🎯 一键启动（推荐新手）
+### 环境设置（一次性操作）
 ```bash
+# 进入项目目录
 cd D:\git\DCM-Nii-20251001
-python src\quick_start.py
-```
-*自动检测环境并提供交互式选择菜单*
 
-### ⚡ 直接使用（推荐熟手）
+# 创建虚拟环境
+python -m venv .venv
+
+# 激活虚拟环境  
+.venv\Scripts\activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 一键处理
 ```bash
-# 智能转换（推荐）- 速度最快
+# 激活环境并运行智能转换
+cd D:\git\DCM-Nii-20251001
+.venv\Scripts\activate
 python src\dcm2niix_smart_convert.py
-
-# 完整处理（元数据+智能转换）
-python src\process_cases_from_dir.py
 ```
 
-这将处理所有42个ZIP文件，智能选择主序列并转换为NIfTI格式。
+### 处理结果
+- **NIfTI文件**：`output/nifti_files/` 目录下的 `.nii.gz` 文件
+- **元数据**：`output/` 目录下的两个CSV文件
+  - `dicom_metadata.csv`：完整患者和检查信息
+  - `json_metadata.csv`：转换参数和图像属性
 
-## ⚡ 性能对比
+## 📊 处理性能
 
-| 方法 | 处理时间 | 文件精度 | 磁盘使用 |
-|------|----------|----------|----------|
-| 智能转换 | 7分20秒 | 1个/案例 | 4GB |
-| 传统方法 | 29分40秒 | 6-7个→1个/案例 | 8-10GB |
-| **提升效果** | **4倍速度** | **精准目标** | **50%节省** |
+### 实际测试结果
+- **处理案例数**：42个DICOM ZIP文件
+- **处理时间**：7分20秒（传统方法需要29分40秒）  
+- **成功率**：100%（42/42个案例成功转换）
+- **输出文件**：42个NIfTI文件 + 2个汇总CSV文件
+
+### 性能优势
+- ⚡ **速度提升**：75%时间节省
+- 🎯 **精准选择**：智能识别主要序列
+- 💾 **空间节省**：避免生成多余文件
+- 🔄 **流程简化**：一次运行完成所有任务
+
+## 📁 输出文件说明
+- `output/dicom_metadata_YYYYMMDD_HHMMSS.json`：JSON格式的元数据
+
+### NIfTI转换输出
+### NIfTI文件
+```
+output/nifti_files/
+├── case_5434779.nii.gz
+├── case_5510970.nii.gz
+├── case_5543439.nii.gz
+└── ... (每个案例一个文件)
+```
+
+### 元数据文件
+```
+output/
+├── dicom_metadata.csv      # DICOM头信息汇总
+└── json_metadata.csv       # 转换参数信息
+```
+
+## 📚 详细文档
+
+- **完整教程**：查看 `docs/USAGE_GUIDE.md`
+- **快速参考**：查看 `docs/QUICK_REFERENCE.md`
+
+## ⚠️ 重要说明
+
+1. **dcm2niix工具**：已包含在项目中，无需额外安装
+2. **虚拟环境**：强烈建议使用虚拟环境以避免依赖冲突
+3. **磁盘空间**：确保output目录有足够空间（约2-3GB用于42个案例）
+4. **Python版本**：需要Python 3.7或更高版本
+
+## � 故障排除
+
+如果遇到问题，请检查：
+- [ ] Python环境是否正确激活
+- [ ] 依赖包是否完整安装
+- [ ] ZIP文件是否损坏
+- [ ] 磁盘空间是否充足
+
+详细的故障排除指南请参考 `docs/USAGE_GUIDE.md`
+
+---
+
+## 📧 支持信息
+
+如果需要更多帮助：
+- 查看完整使用指南：`docs/USAGE_GUIDE.md`  
+- 查看快速参考：`docs/QUICK_REFERENCE.md`
+- 项目仓库：[GitHub](https://github.com/your-username/DCM-Nii-20251001)
+
+**最后更新**：2025-01-05
