@@ -34,6 +34,7 @@ def analyze_dicom_series(extract_path):
                 modality = getattr(ds, 'Modality', 'Unknown')
                 rows = getattr(ds, 'Rows', 0)
                 columns = getattr(ds, 'Columns', 0)
+                slice_thickness = getattr(ds, 'SliceThickness', None)
                 series_info[series_uid].append({
                     'file_path': file_path,
                     'series_number': series_number,
@@ -41,6 +42,7 @@ def analyze_dicom_series(extract_path):
                     'modality': str(modality),
                     'rows': rows,
                     'columns': columns,
+                    'slice_thickness': slice_thickness,
                     'file_size': os.path.getsize(file_path)
                 })
             except Exception:
@@ -54,6 +56,20 @@ def analyze_dicom_series(extract_path):
             continue
         file_count = len(files)
         first_file = files[0]
+        pixel_area = max(first_file['rows'], 0) * max(first_file['columns'], 0)
+        slice_thickness = first_file.get('slice_thickness', None)
+        
+        # 硬性过滤：只保留切片厚度在4.5-5.5mm范围内的序列
+        if slice_thickness is not None:
+            try:
+                thickness_value = float(slice_thickness)
+                if not (4.5 <= thickness_value <= 5.5):
+                    continue  # 跳过不符合厚度要求的序列
+            except (ValueError, TypeError):
+                continue  # 无法解析厚度值，跳过该序列
+        else:
+            continue  # 没有厚度信息，跳过该序列
+        
         score = 0
         score += min(file_count * 2, 100)
         if first_file['rows'] > 0 and first_file['columns'] > 0:
@@ -67,6 +83,7 @@ def analyze_dicom_series(extract_path):
             score += 10
         if first_file['modality'] == 'CT':
             score += 20
+        
         if score > best_score:
             best_score = score
             best_series = {
@@ -75,9 +92,15 @@ def analyze_dicom_series(extract_path):
                 'file_count': file_count,
                 'description': first_file['series_description'],
                 'series_number': first_file['series_number'],
-                'score': score
+                'score': score,
+                'slice_count': file_count,
+                'pixel_area': pixel_area,
+                'slice_thickness': slice_thickness
             }
-    return best_series, f"Selected series with score {best_score}"
+    
+    if best_series is None:
+        return None, "No series found with slice thickness in 4.5-5.5mm range"
+    return best_series, f"Selected series with score {best_score} and slice thickness {best_series['slice_thickness']}mm"
 
 def create_series_directory(series_info, temp_base_dir, case_name):
     series_dir = os.path.join(temp_base_dir, f"{case_name}_main_series")
@@ -140,7 +163,9 @@ def process_zip_to_nifti_smart(zip_path, temp_dir, output_base_dir, dcm2niix_pat
                         'series_number': best_series['series_number'],
                         'description': best_series['description'],
                         'file_count': best_series['file_count'],
-                        'score': best_series['score']
+                        'score': best_series['score'],
+                        'slice_count': best_series['slice_count'],
+                        'pixel_area': best_series['pixel_area']
                     },
                     'nii_files': len(nii_files),
                     'json_files': len(json_files),
