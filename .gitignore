@@ -6,7 +6,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -21,6 +20,20 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Distribution packages - Keep final packages
+!dist/
+dist/*
+!dist/*.zip
+!dist/*.md
+!dist/README.md
+!dist/分发包说明.md
+!dist/快速开始指南.md
+!dist/USAGE_*.txt
+
+# Build artifacts
+DCM-Nii-Executable/
+*.spec
 
 # Virtual Environment
 .venv/
@@ -58,6 +71,15 @@ output/*
 *.tmp
 *.temp
 *.log
+.todo
+
+# Development files
+package_*.py
+create_batch_package.py
+quick_package_batch.py
+test_batch_launcher.py
+PROJECT_CHECKLIST.md
+PROJECT_README.md
 
 # DICOM and NIfTI files (can be large)
 *.dcm
