@@ -127,6 +127,59 @@ def process_zip_file_fast(zip_path):
         print(f"ERROR (error: {str(e)})")
         return None
 
+def process_directory(dir_path):
+    """
+    处理已解压的DICOM目录
+    """
+    dir_name = Path(dir_path).name
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Processing {dir_name}...", end=' ')
+    
+    try:
+        dicom_count = 0
+        metadata = None
+        
+        # 遍历目录中的所有文件
+        for file_path in Path(dir_path).rglob('*'):
+            if not file_path.is_file():
+                continue
+            
+            # 跳过明显不是DICOM的文件
+            filename = file_path.name.lower()
+            if filename.endswith(('.txt', '.xml', '.json', '.jpg', '.png', '.pdf')):
+                continue
+            
+            try:
+                # 读取DICOM文件
+                dcm = pydicom.dcmread(str(file_path), force=True)
+                dicom_count += 1
+                
+                # 只提取第一个有效DICOM的元数据
+                if metadata is None:
+                    metadata = extract_dicom_metadata(dcm)
+                    if metadata:
+                        metadata['ZipFileName'] = dir_name
+                
+                # 找到第一个有效DICOM后就可以停止
+                if metadata and dicom_count >= 1:
+                    break
+                    
+            except Exception:
+                # 不是有效的DICOM文件，跳过
+                continue
+        
+        if metadata:
+            metadata['DicomFileCount'] = dicom_count
+            metadata['ProcessingTime'] = datetime.now().isoformat()
+            print(f"OK ({dicom_count}+ files)")
+            return metadata
+        else:
+            print("SKIP (no DICOM found)")
+            return None
+            
+    except Exception as e:
+        print(f"ERROR (error: {str(e)})")
+        return None
+
 def choose_directory_via_gui():
     """通过GUI选择目录"""
     if tk is None:
@@ -170,25 +223,38 @@ def main():
     # 创建输出目录
     output_dir.mkdir(exist_ok=True, parents=True)
     
-    # 获取所有ZIP文件
+    # 获取所有ZIP文件和DICOM目录
     zip_files = sorted(list(data_dir.glob("*.zip")))
+    dicom_dirs = sorted([d for d in data_dir.iterdir() if d.is_dir() and d.name != 'output'])
     
-    if not zip_files:
-        print(f"No ZIP files found in: {data_dir}")
+    total_items = len(zip_files) + len(dicom_dirs)
+    
+    if total_items == 0:
+        print(f"No ZIP files or DICOM directories found in: {data_dir}")
         return
     
     print(f"\n{'='*60}")
-    print(f"Found {len(zip_files)} ZIP files to process")
+    print(f"Found {len(zip_files)} ZIP files and {len(dicom_dirs)} directories")
+    print(f"Total items to process: {total_items}")
     print(f"{'='*60}\n")
     
-    # 处理所有ZIP文件
+    # 处理所有ZIP文件和目录
     all_metadata = []
     success_count = 0
     start_time = datetime.now()
     
+    # 先处理ZIP文件
     for i, zip_file in enumerate(zip_files, 1):
-        print(f"[{i}/{len(zip_files)}] ", end='')
+        print(f"[{i}/{total_items}] ", end='')
         metadata = process_zip_file_fast(zip_file)
+        if metadata:
+            all_metadata.append(metadata)
+            success_count += 1
+    
+    # 再处理目录
+    for j, dicom_dir in enumerate(dicom_dirs, len(zip_files) + 1):
+        print(f"[{j}/{total_items}] ", end='')
+        metadata = process_directory(dicom_dir)
         if metadata:
             all_metadata.append(metadata)
             success_count += 1
@@ -198,7 +264,9 @@ def main():
     
     print(f"\n{'='*60}")
     print(f"Processing completed in {elapsed:.1f} seconds")
-    print(f"Success: {success_count}/{len(zip_files)} ZIP files")
+    print(f"Success: {success_count}/{total_items} items")
+    print(f"  ZIP files: {len(zip_files)}")
+    print(f"  Directories: {len(dicom_dirs)}")
     print(f"{'='*60}\n")
     
     if all_metadata:
@@ -216,18 +284,20 @@ def main():
         print(f"Results saved to:")
         print(f"  CSV: {csv_path}")
         print(f"  JSON: {json_path}")
-        print(f"\nAverage processing time: {elapsed/len(zip_files):.2f} seconds per ZIP")
+        print(f"\nAverage processing time: {elapsed/total_items:.2f} seconds per item")
         
         # 显示完成提示
         if tk is not None:
             messagebox.showinfo(
                 "完成", 
-                f"已处理 {success_count}/{len(zip_files)} 个ZIP文件\n"
+                f"已处理 {success_count}/{total_items} 个病例\n"
+                f"  ZIP文件: {len(zip_files)}\n"
+                f"  目录: {len(dicom_dirs)}\n"
                 f"耗时: {elapsed:.1f} 秒\n\n"
                 f"结果保存在:\n{output_dir}"
             )
     else:
-        error_msg = "No valid DICOM data found in any ZIP file"
+        error_msg = "No valid DICOM data found in any ZIP file or directory"
         print(error_msg)
         if tk is not None:
             messagebox.showwarning("结果", error_msg)
