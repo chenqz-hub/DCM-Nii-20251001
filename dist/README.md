@@ -2,11 +2,63 @@
 
 ## 🎯 当前可用版本
 
-DCM-Nii v2.0.0 提供两个版本：轻量版和完整版
+DCM-Nii v2.0.0 提供三个版本：轻量版、完整版和便携版
 
 ---
 
-### 🖥️ 完整版 v2.0.0 (包含MRIcroGL，推荐)
+### 📱 便携版 v2.0.0 (零安装，适合医院/受限环境) ⭐ **推荐**
+� **目录**: `portable/` 
+�📦 **文件**: 
+  - 完整版: `portable/DCM-Nii_portable_20251025_144641.zip` (118 MB)
+  - 邮件分卷: `portable/DCM-Nii_portable.part*.rar` (3个分卷，每个≤45 MB)
+📄 **说明**: `portable/README.md` 和 `portable/README_WINRAR.txt`
+
+**适合**: 医院电脑、无Python环境、新手用户
+
+**核心优势**:
+- ✅ **完全免安装** - 解压即用，无需配置
+- ✅ **内置Python 3.10.11** - 无需安装Python
+- ✅ **预装所有依赖** - pydicom、pandas、numpy已内置
+- ✅ **完全离线** - 不需要联网下载任何东西
+- ✅ **不需要权限** - 普通用户即可运行
+- ✅ **绿色环保** - 不修改系统，删除即走
+
+**通过邮件传输**:
+1. 从`portable/`目录发送3个分卷文件（每个45MB以下，适合邮件附件）
+2. 接收方用WinRAR/7-Zip打开第一个文件自动解压
+3. 双击`Start_DCM-Nii.bat`即可使用
+
+**通过网盘/内网共享**:
+1. 直接使用`portable/DCM-Nii_portable_20251025_144641.zip` (118 MB)
+2. 解压到任意目录
+3. 双击`Start_DCM-Nii.bat`即可使用
+
+**包含内容**:
+- ✅ Python 3.10.11嵌入版运行环境
+- ✅ 所有依赖包（pydicom 3.0.1, pandas 2.3.3, numpy 2.2.6）
+- ✅ 所有核心Python脚本（含v2.0.0新功能）
+- ✅ 完整文档体系
+- ✅ dcm2niix.exe转换工具
+- ✅ 一键启动批处理文件
+
+**快速开始**:
+```
+方式1 (邮件分卷):
+  1. 打开 portable/DCM-Nii_portable.part1.rar
+  2. WinRAR自动合并提取出 ZIP 文件
+  3. 解压ZIP到任意位置
+  4. 双击 Start_DCM-Nii.bat
+
+方式2 (完整ZIP):
+  1. 解压 portable/DCM-Nii_portable_20251025_144641.zip
+  2. 双击 Start_DCM-Nii.bat
+```
+
+📖 **详细文档**: 请查看 `portable/README.md`
+
+---
+
+### 🖥️ 完整版 v2.0.0 (包含MRIcroGL)
 📦 **文件**: `DCM-Nii_full_20251025_134540.zip` (65.38 MB)
 
 **适合**: 需要医学影像查看器的用户
