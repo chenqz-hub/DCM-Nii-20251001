@@ -254,7 +254,6 @@ python src/dcm2niix_batch_convert_max_layers.py "E:\output_deid"
 
 - **需要固定切片厚度（如5mm）**: 使用 `dcm2niix_batch_convert_anywhere_5mm.py`
 - **需要最大层数序列**: 使用 `dcm2niix_batch_convert_max_layers.py`
-- **智能综合评分**: 使用原始的 `dcm2niix_smart_convert.py`
 
 ### Q2: 脱敏工具支持哪些输入？
 

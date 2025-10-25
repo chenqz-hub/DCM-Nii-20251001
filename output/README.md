@@ -22,49 +22,43 @@
 └── temp_dicom_extraction/               # 临时文件夹（自动清理）
 ```
 
-### 🏗️ 集中式输出（项目专用 - dcm2niix_smart_convert.py）
+### 🏗️ 集中式输出（项目专用）
 ```
 output/
-├── nifti_files/                         # 项目统一输出目录
-│   ├── dicom_*_*.nii.gz                # NIfTI影像文件
-│   ├── dicom_*_*.json                  # JSON元数据文件
-│   ├── json_metadata_summary_*.csv     # 完整元数据摘要（38字段）
-│   ├── clinical_info_*.csv             # 临床信息摘要（7字段）
-│   └── smart_conversion_report_*.json  # 处理报告
-├── dicom_metadata_*.csv                # 原始DICOM元数据
-└── dicom_metadata_*.json               # 原始DICOM元数据JSON格式
+├── case1_PatientID/                     # 各案例独立目录
+│   └── converted.nii.gz                # 转换的影像文件
+├── case2_PatientID/
+│   └── converted.nii.gz
+├── conversion_log.txt                  # 转换日志
+└── failed_cases_*.txt                  # 失败案例报告（如有）
 ```
 
 ## 文件说明
 
 ### NIfTI文件
-- **格式**：`dicom_案例名_患者ID_序列号_描述.nii.gz`
+- **格式**：`案例名_患者ID.nii.gz` 或自动生成的文件名
 - **内容**：经过智能选择的主要序列转换的医学影像
 - **用途**：医学影像分析、可视化、进一步处理
 
 ### 元数据文件
 - **JSON文件**：每个NIfTI文件对应的详细技术参数
-- **统一CSV汇总**：
-  - `unified_metadata_summary_*.csv`：所有案例的38个字段完整汇总
-  - `unified_clinical_info_*.csv`：患者信息的7个关键字段汇总
 - **处理报告**：详细的转换过程和结果统计
+- **错误日志**：`failed_cases_*.txt` 记录失败案例和原因
 
 ## 使用建议
 
 ### ⭐ 推荐：分布式输出
 - **优势**：结果与源数据就近存放，便于管理和分享
 - **适用**：日常处理、临时任务、数据交接
-- **脚本**：`dcm2niix_batch_convert_anywhere.py`
-
-### 🏗️ 备选：集中式输出
-- **优势**：项目内统一管理，便于脚本自动化
-- **适用**：长期项目、固定工作流
-- **脚本**：`dcm2niix_smart_convert.py`
+- **脚本**：
+  - `dcm2niix_batch_convert_max_layers.py` (最大层数优先)
+  - `dcm2niix_batch_convert_anywhere_5mm.py` (5mm切片筛选)
 
 ### 处理报告
 - **转换统计**：成功率、失败案例、处理时间
 - **序列选择信息**：智能算法选择的序列类型分布
 - **质量控制**：数据完整性和处理日志
+- **错误汇总**：按类型分类的错误报告
 
 ## 使用说明
 

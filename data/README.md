@@ -24,9 +24,11 @@ python src/dcm2niix_batch_convert_anywhere.py "C:/你的/数据目录"
 **优势**：无需复制文件，直接处理任意位置的数据
 
 ### 传统方式：固定项目目录
-1. 将DICOM ZIP文件复制到 `data/Downloads20251005/` 目录
-2. 运行项目脚本：`python src/dcm2niix_smart_convert.py`
-3. 处理结果保存到 `output/nifti_files/` 目录
+1. 将DICOM ZIP文件复制到 `data/` 目录
+2. 运行项目脚本：
+   - `python src/dcm2niix_batch_convert_max_layers.py` (最大层数优先)
+   - `python src/dcm2niix_batch_convert_anywhere_5mm.py` (5mm切片筛选)
+3. 处理结果保存到各自的 `output/` 目录
 
 ## 数据放置方式
 
