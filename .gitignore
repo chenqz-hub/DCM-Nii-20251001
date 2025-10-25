@@ -29,7 +29,13 @@ dist/*
 !dist/README.md
 !dist/分发包说明.md
 !dist/快速开始指南.md
+!dist/全新电脑安装指南.md
 !dist/USAGE_*.txt
+
+# Portable edition - Binary files too large for git
+dist/portable/
+dist/cache/
+dist/temp_*/
 
 # Build artifacts
 DCM-Nii-Executable/
