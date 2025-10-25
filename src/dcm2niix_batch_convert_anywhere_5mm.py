@@ -45,7 +45,8 @@ def analyze_dicom_series(extract_path):
                     'slice_thickness': slice_thickness,
                     'file_size': os.path.getsize(file_path)
                 })
-            except Exception:
+            except Exception as e:
+                print(f"  ⚠ 跳过文件 {file}: {str(e)}")
                 continue
     if not series_info:
         return None, "No valid DICOM files found"
@@ -65,7 +66,8 @@ def analyze_dicom_series(extract_path):
                 thickness_value = float(slice_thickness)
                 if not (4.5 <= thickness_value <= 5.5):
                     continue  # 跳过不符合厚度要求的序列
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as e:
+                print(f"  ⚠ 无法解析切片厚度值 '{slice_thickness}': {str(e)}")
                 continue  # 无法解析厚度值，跳过该序列
         else:
             continue  # 没有厚度信息，跳过该序列
@@ -111,6 +113,36 @@ def create_series_directory(series_info, temp_base_dir, case_name):
         shutil.copy2(src_path, dst_path)
     return series_dir
 
+def keep_largest_nifti(case_output_dir, zip_name):
+    """
+    如果生成了多个NIfTI文件，只保留最大的那个，删除其他的
+    同时删除对应的JSON文件
+    """
+    nii_files = list(Path(case_output_dir).glob(f"{zip_name}_*.nii.gz"))
+    
+    if len(nii_files) <= 1:
+        return nii_files  # 只有1个或0个文件，不需要处理
+    
+    # 找到最大的文件
+    largest_file = max(nii_files, key=lambda f: f.stat().st_size)
+    files_to_delete = [f for f in nii_files if f != largest_file]
+    
+    deleted_count = 0
+    for nii_file in files_to_delete:
+        # 删除对应的JSON文件
+        json_file = nii_file.with_suffix('.json')
+        if json_file.exists():
+            json_file.unlink()
+            deleted_count += 1
+        # 删除NIfTI文件
+        nii_file.unlink()
+        deleted_count += 1
+    
+    if deleted_count > 0:
+        print(f"  🗑️  Removed {len(files_to_delete)} smaller NIfTI file(s), kept largest: {largest_file.name}")
+    
+    return [largest_file]
+
 def run_dcm2niix_smart(input_dir, output_dir, dcm2niix_path, case_name):
     try:
         cmd = [
@@ -154,7 +186,8 @@ def process_zip_to_nifti_smart(zip_path, temp_dir, output_base_dir, dcm2niix_pat
             print(f"  Converting main series...")
             success, output = run_dcm2niix_smart(series_dir, case_output_dir, dcm2niix_path, zip_name)
             if success:
-                nii_files = list(Path(case_output_dir).glob(f"{zip_name}_*.nii.gz"))
+                # 后处理：只保留最大的NIfTI文件
+                nii_files = keep_largest_nifti(case_output_dir, zip_name)
                 json_files = list(Path(case_output_dir).glob(f"{zip_name}_*.json"))
                 result = {
                     'zip_file': zip_name,
@@ -176,7 +209,7 @@ def process_zip_to_nifti_smart(zip_path, temp_dir, output_base_dir, dcm2niix_pat
                     'dcm2niix_output': output,
                     'processing_time': datetime.now().isoformat()
                 }
-                print(f"  Success: Generated {len(nii_files)} NIfTI files")
+                print(f"  ✓ Success: Generated {len(nii_files)} NIfTI file(s)")
                 return result
             else:
                 result = {
@@ -258,7 +291,8 @@ def extract_json_metadata_to_csv(output_dir):
                                     dicom_info['PatientAge'] = 'Unknown'
                             else:
                                 dicom_info['PatientAge'] = 'Unknown'
-                        except:
+                        except Exception as e:
+                            print(f"  ⚠ 无法解析PatientAge: {str(e)}")
                             dicom_info['PatientAge'] = 'Unknown'
                 metadata = {
                     'FileName': json_file.name,
@@ -588,7 +622,7 @@ def main():
     
     # 第一步：提取DICOM元数据
     print(f"\nStep 1: Extracting DICOM metadata from ZIP files...")
-    extract_script_path = base_dir / "src" / "extract_case_metadata_flexible.py"
+    extract_script_path = base_dir / "src" / "extract_case_metadata_anywhere.py"
     if extract_script_path.exists():
         try:
             import subprocess
@@ -606,7 +640,7 @@ def main():
         except Exception as e:
             print(f"⚠ Could not run metadata extraction: {e}")
     else:
-        print("⚠ extract_case_metadata.py not found, skipping metadata extraction")
+        print("⚠ extract_case_metadata_anywhere.py not found, skipping metadata extraction")
         
     # 检查是否生成了元数据文件
     metadata_files = list(data_dir.glob("*metadata*.csv"))
@@ -616,9 +650,14 @@ def main():
         print("⚠ No metadata CSV files found after extraction")
     
     # 第二步：批量转换所有ZIP文件
-    with tempfile.TemporaryDirectory() as temp_dir:
+    # 临时目录设置在用户选择的主目录下，避免跨盘符问题
+    custom_temp_dir = data_dir / "temp_dcm2niix_processing"
+    custom_temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    with tempfile.TemporaryDirectory(dir=str(custom_temp_dir)) as temp_dir:
         all_results = []
         all_json_files = []
+        skipped_count = 0
         
         for i, zip_file in enumerate(zip_files, 1):
             print(f"\n[{i}/{len(zip_files)}] Processing {zip_file.name}...")
@@ -626,6 +665,26 @@ def main():
             # 为每个ZIP在其源目录下创建output文件夹
             zip_output_dir = zip_file.parent / "output"
             zip_output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 检查是否已经存在输出文件（跳过已成功转换的case）
+            existing_nii = list(zip_output_dir.glob(f"{zip_file.stem}_*.nii.gz"))
+            if existing_nii:
+                print(f"  ⏩ Skipped - Already converted (found {len(existing_nii)} NIfTI file(s))")
+                skipped_count += 1
+                # 仍然收集已存在的JSON文件用于汇总
+                existing_json = list(zip_output_dir.glob(f"{zip_file.stem}_*.json"))
+                all_json_files.extend(existing_json)
+                # 添加跳过记录到结果
+                result = {
+                    'zip_file': zip_file.stem,
+                    'success': True,
+                    'skipped': True,
+                    'nii_files': len(existing_nii),
+                    'json_files': len(existing_json),
+                    'processing_time': datetime.now().isoformat()
+                }
+                all_results.append(result)
+                continue
             
             # 转换并收集结果
             result = process_zip_to_nifti_smart(zip_file, temp_dir, zip_output_dir, dcm2niix_path)
@@ -640,19 +699,69 @@ def main():
         # 第三步：生成汇总报告和统计
         successful = [r for r in all_results if r['success']]
         failed = [r for r in all_results if not r['success']]
+        skipped = [r for r in all_results if r.get('skipped', False)]
+        newly_processed = [r for r in all_results if r['success'] and not r.get('skipped', False)]
         
         print(f"\n{'='*60}")
         print(f"CONVERSION SUMMARY")
         print(f"{'='*60}")
         print(f"Total ZIP files: {len(zip_files)}")
-        print(f"Successfully converted: {len(successful)}")
+        print(f"Skipped (already converted): {len(skipped)}")
+        print(f"Newly processed: {len(newly_processed)}")
+        print(f"Successfully converted (total): {len(successful)}")
         print(f"Failed: {len(failed)}")
         print(f"Success rate: {len(successful)/len(zip_files)*100:.1f}%")
         
+        # 错误分类统计
         if failed:
-            print(f"\nFailed cases:")
+            print(f"\n{'='*60}")
+            print(f"ERROR SUMMARY")
+            print(f"{'='*60}")
+            
+            # 按错误类型分类
+            error_types = defaultdict(list)
             for f in failed:
-                print(f"  - {f['zip_file']}: {f['error']}")
+                error_msg = f.get('error', 'Unknown error')
+                # 简化错误类型
+                if 'No valid DICOM' in error_msg or 'No suitable series' in error_msg:
+                    error_type = 'DICOM文件问题'
+                elif 'slice thickness' in error_msg.lower() or '4.5-5.5' in error_msg:
+                    error_type = '切片厚度不符合要求'
+                elif 'dcm2niix' in error_msg.lower():
+                    error_type = 'dcm2niix转换失败'
+                elif 'extract' in error_msg.lower() or 'zip' in error_msg.lower():
+                    error_type = 'ZIP解压失败'
+                else:
+                    error_type = '其他错误'
+                error_types[error_type].append(f['zip_file'])
+            
+            print(f"\n按错误类型分类:")
+            for error_type, cases in sorted(error_types.items(), key=lambda x: len(x[1]), reverse=True):
+                print(f"\n  {error_type} ({len(cases)} cases):")
+                for case in cases[:10]:  # 最多显示10个
+                    print(f"    - {case}")
+                if len(cases) > 10:
+                    print(f"    ... 还有 {len(cases)-10} 个case")
+            
+            print(f"\n详细错误信息:")
+            for f in failed:
+                print(f"  ✗ {f['zip_file']}")
+                print(f"    错误: {f['error']}")
+            
+            # 保存失败case列表到文件
+            failed_list_path = summary_output_dir / f"failed_cases_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            with open(failed_list_path, 'w', encoding='utf-8') as f:
+                f.write("# 转换失败的case列表\n")
+                f.write(f"# 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"# 总失败数: {len(failed)}\n\n")
+                for error_type, cases in sorted(error_types.items(), key=lambda x: len(x[1]), reverse=True):
+                    f.write(f"\n## {error_type} ({len(cases)} cases)\n")
+                    for case in cases:
+                        f.write(f"{case}\n")
+                f.write(f"\n## 详细错误信息\n")
+                for fail in failed:
+                    f.write(f"\n{fail['zip_file']}: {fail['error']}\n")
+            print(f"\n✓ 失败case列表已保存: {failed_list_path.name}")
         
         # 第四步：生成汇总CSV（保存到选择目录的output文件夹）
         summary_output_dir = data_dir / "output"

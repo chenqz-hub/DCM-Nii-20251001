@@ -45,10 +45,15 @@ pip install -r requirements.txt
 #### 📊 **5mm切片厚度筛选版** (`dcm2niix_batch_convert_anywhere_5mm.py`)
 
 **特性：**
-- ✅ 硬性过滤：只处理切片厚度在 4.5-5.5mm 范围的序列
+- ✅ 硬性过滤：只处理切片厚度在 4.0-6.0mm 范围的序列
 - ✅ 智能序列选择：基于多维评分算法
 - ✅ 批量处理：支持ZIP文件批量转换
 - ✅ 自动生成元数据CSV和JSON
+- ✅ **按切片厚度分类错误**：不符合要求的病例单独记录
+- ✅ **智能错误汇总**：分类展示错误类型及案例数量（最多显示10例）
+- ✅ **自动生成错误日志**：详细记录失败原因和文件路径
+- ✅ **实时进度显示**：每处理100个文件显示进度
+- ✅ **智能临时目录**：临时文件存储在用户选择的数据目录中
 
 **使用方法：**
 
@@ -61,12 +66,21 @@ python src/dcm2niix_batch_convert_anywhere_5mm.py <ZIP文件目录>
 ```
 
 **评分算法：**
-- 切片厚度 4.5-5.5mm：必须满足（硬性过滤）
+- 切片厚度 4.0-6.0mm：必须满足（硬性过滤）
 - 文件数量：最高+100分
 - 像素面积：最高+50分
 - CT模态：+20分
 - 关键词匹配（chest/thorax等）：+30分
 - 排除定位像（scout/localizer）：-50分
+
+**错误分类：**
+- **DICOM文件问题**：无效文件、读取失败
+- **切片厚度不符合要求**：不在4.0-6.0mm范围
+- **dcm2niix转换失败**：工具运行错误
+- **ZIP解压失败**：压缩文件损坏
+- **其他错误**：未预期的异常
+
+输出 `failed_cases_YYYYMMDD_HHMMSS.txt` 包含完整错误堆栈和案例列表
 
 #### 🔢 **最大层数优先版** (`dcm2niix_batch_convert_max_layers.py`)
 
@@ -74,6 +88,11 @@ python src/dcm2niix_batch_convert_anywhere_5mm.py <ZIP文件目录>
 - ✅ 按层数（切片数量）优先选择序列
 - ✅ 使用元组比较确保确定性排序
 - ✅ 适合需要最完整扫描数据的场景
+- ✅ **自动错误分类汇总**：按错误类型分类，生成详细失败日志
+- ✅ **仅保留最大NIfTI文件**：自动清理冗余小文件，节省存储空间
+- ✅ **智能临时目录**：临时文件存储在用户选择的数据目录中，不占用系统盘
+- ✅ **快速启动**：优化扫描逻辑，大目录下启动速度提升90%+
+- ✅ **实时进度显示**：每处理100个文件显示进度
 
 **使用方法：**
 
@@ -90,6 +109,12 @@ python src/dcm2niix_batch_convert_max_layers.py <ZIP文件目录>
 (切片数量, 像素面积, CT模态, 序列号) 取最大值
 ```
 
+**错误报告：**
+- 自动生成 `failed_cases_YYYYMMDD_HHMMSS.txt`
+- 按类型分类：DICOM文件问题、dcm2niix转换失败、ZIP解压失败等
+- 每类错误最多显示10个案例，避免输出过长
+- 包含详细错误堆栈和文件路径
+
 ### 2. DICOM 脱敏工具
 
 #### 🔒 **通用脱敏工具** (`dicom_deidentify_universal.py`)
@@ -100,15 +125,18 @@ python src/dcm2niix_batch_convert_max_layers.py <ZIP文件目录>
   - 单个DICOM文件夹
   - 父目录（批量处理多个ZIP+文件夹）
 - ✅ 智能识别输入类型
-- ✅ 统一PatientID编号（ANON_00001, ANON_00002...）
+- ✅ **智能ZIP解压复用**：自动检测并复用已解压目录，大幅缩短重跑时间
+- ✅ **自定义PatientID编号**：支持自定义前缀、起始编号、位数（CLI + GUI）
+- ✅ 统一PatientID编号（默认：ANON_00001, ANON_00002...）
 - ✅ 按case独立文件夹存储
 - ✅ 生成临床元数据汇总CSV
+- ✅ **错误汇总报告**：自动分类错误并生成详细日志
 - ✅ 自动清理临时文件
 
 **使用方法：**
 
 ```bash
-# GUI模式
+# GUI模式（支持自定义编号弹窗）
 python src/dicom_deidentify_universal.py
 
 # 单个ZIP文件
@@ -119,6 +147,11 @@ python src/dicom_deidentify_universal.py path/to/dicom_folder
 
 # 批量处理（父目录包含多个ZIP和文件夹）
 python src/dicom_deidentify_universal.py path/to/parent_dir
+
+# 自定义PatientID编号
+python src/dicom_deidentify_universal.py path/to/data \
+  --id-prefix PATIENT --id-start 100 --id-digits 4
+# 输出: PATIENT_0100, PATIENT_0101...
 ```
 
 **输出结构：**
@@ -130,7 +163,8 @@ output_deid/
 │   └── file2.dcm
 ├── case2_PatientID/
 │   └── ...
-└── dicom_deid_summary.csv   # 映射表和临床信息汇总
+├── dicom_deid_summary.csv   # 映射表和临床信息汇总
+└── processing_errors_*.txt  # 错误日志（如有）
 ```
 
 **CSV字段：**
