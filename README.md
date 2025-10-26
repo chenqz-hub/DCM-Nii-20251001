@@ -85,6 +85,8 @@ python src/dcm2niix_batch_convert_anywhere_5mm.py <ZIP文件目录>
 #### 🔢 **最大层数优先版** (`dcm2niix_batch_convert_max_layers.py`)
 
 **特性：**
+- ✅ **双输入支持**：同时处理ZIP文件和DICOM文件夹 ⭐ NEW
+- ✅ **自动检测**：智能识别目录中的ZIP和DICOM文件夹
 - ✅ 按层数（切片数量）优先选择序列
 - ✅ 使用元组比较确保确定性排序
 - ✅ 适合需要最完整扫描数据的场景
@@ -97,11 +99,11 @@ python src/dcm2niix_batch_convert_anywhere_5mm.py <ZIP文件目录>
 **使用方法：**
 
 ```bash
-# GUI模式
+# GUI模式（支持ZIP和DICOM文件夹混合目录）
 python src/dcm2niix_batch_convert_max_layers.py
 
 # 命令行模式  
-python src/dcm2niix_batch_convert_max_layers.py <ZIP文件目录>
+python src/dcm2niix_batch_convert_max_layers.py <包含ZIP/DICOM文件夹的目录>
 ```
 
 **选择策略：**
@@ -343,14 +345,22 @@ def determine_input_mode(input_path):
 
 ## ✨ 更新日志
 
-### 2025-01-12
+### v2.1.0 - 2025-10-26
+- ✨ **[NEW]** `dcm2niix_batch_convert_max_layers.py` 增加DICOM文件夹支持
+  - 支持ZIP文件和DICOM文件夹混合输入
+  - 自动识别并分类处理两种输入类型
+  - 统一输出格式和错误报告
+  - 向后兼容原有ZIP处理流程
+
+### v2.0.0 - 2025-01-12
 - ✅ 添加 5mm 切片厚度筛选版本转换脚本
 - ✅ 创建通用DICOM脱敏工具（支持3种输入模式）
 - ✅ 优化元数据提取工具（支持流式解压和自定义临时目录）
 - ✅ 添加最大层数优先转换版本
 - ✅ 完善文档和使用说明
+- ✅ 创建便携版打包脚本和分发说明
 
-### 2024-10-05
+### v1.0.0 - 2024-10-05
 - 初始版本发布
 - 基础DICOM到NIfTI转换功能
 - 智能序列选择算法

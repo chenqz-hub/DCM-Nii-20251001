@@ -168,6 +168,146 @@ def process_zip_to_nifti_smart(zip_path, temp_dir, output_base_dir, dcm2niix_pat
         print(f"  ✗ Exception: {str(e)}")
         return result
 
+
+def process_dicom_folder_to_nifti_smart(dicom_folder_path, output_base_dir, dcm2niix_path):
+    """
+    处理DICOM文件夹到NIfTI的智能转换
+    """
+    folder_name = Path(dicom_folder_path).name
+    print(f"\nProcessing DICOM folder: {folder_name}...")
+    
+    try:
+        # 创建输出目录
+        case_output_dir = Path(output_base_dir) / folder_name
+        case_output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 检查文件夹中是否有DICOM文件
+        dicom_files = []
+        for ext in ['*.dcm', '*.dicom', '*.DCM', '*.DICOM']:
+            dicom_files.extend(list(Path(dicom_folder_path).rglob(ext)))
+        
+        # 如果没有标准扩展名的DICOM文件，尝试检查所有文件
+        if not dicom_files:
+            print(f"  No DICOM files with standard extensions found, checking all files...")
+            all_files = [f for f in Path(dicom_folder_path).rglob('*') if f.is_file()]
+            for file_path in all_files[:10]:  # 只检查前10个文件避免太慢
+                try:
+                    pydicom.dcmread(str(file_path), force=True)
+                    dicom_files = all_files  # 如果发现DICOM文件，使用所有文件
+                    break
+                except:
+                    continue
+        
+        if not dicom_files:
+            return {
+                'dicom_folder': folder_name,
+                'success': False,
+                'error': 'No valid DICOM files found in folder',
+                'processing_time': datetime.now().isoformat()
+            }
+        
+        print(f"  Found {len(dicom_files)} DICOM files")
+        
+        # 分析DICOM序列
+        print(f"  Analyzing DICOM series...")
+        best_series, analysis_msg = analyze_dicom_series(str(dicom_folder_path))
+        
+        if not best_series:
+            return {
+                'dicom_folder': folder_name,
+                'success': False,
+                'error': f'No valid DICOM series found: {analysis_msg}',
+                'processing_time': datetime.now().isoformat()
+            }
+            return {
+                'dicom_folder': folder_name,
+                'success': False,
+                'error': 'No suitable series found after analysis',
+                'processing_time': datetime.now().isoformat()
+            }
+        
+        print(f"  Selected series: {best_series['series_uid'][:16]}... "
+              f"({len(best_series['files'])} files, "
+              f"Modality: {best_series['modality']}, "
+              f"Description: {best_series['series_description']})")
+        
+        # 直接使用原始DICOM文件夹进行转换
+        print(f"  Running dcm2niix conversion...")
+        success, output = run_dcm2niix_smart(str(dicom_folder_path), str(case_output_dir), dcm2niix_path, folder_name)
+        
+        if success:
+            # 保留最大的NIfTI文件
+            nii_files = keep_largest_nifti(str(case_output_dir), folder_name)
+            json_files = list(Path(case_output_dir).glob(f"{folder_name}_*.json"))
+            
+            if nii_files and json_files:
+                print(f"  ✓ Conversion successful")
+                print(f"    NIfTI: {[f.name for f in nii_files]}")
+                print(f"    JSON: {[f.name for f in json_files]}")
+                return {
+                    'dicom_folder': folder_name,
+                    'success': True,
+                    'nifti_files': [str(f) for f in nii_files],
+                    'json_files': [str(f) for f in json_files],
+                    'series_info': f"{best_series['modality']}: {best_series['series_description']}",
+                    'file_count': len(best_series['files']),
+                    'processing_time': datetime.now().isoformat()
+                }
+            else:
+                return {
+                    'dicom_folder': folder_name,
+                    'success': False,
+                    'error': 'dcm2niix succeeded but no output files found',
+                    'processing_time': datetime.now().isoformat()
+                }
+        else:
+            return {
+                'dicom_folder': folder_name,
+                'success': False,
+                'error': f'dcm2niix failed: {output}',
+                'processing_time': datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        return {
+            'dicom_folder': folder_name,
+            'success': False,
+            'error': str(e),
+            'processing_time': datetime.now().isoformat()
+        }
+
+
+def keep_largest_nifti(case_output_dir, case_name):
+    """
+    如果生成了多个NIfTI文件，只保留最大的那个，删除其他的
+    同时删除对应的JSON文件
+    """
+    nii_files = list(Path(case_output_dir).glob(f"{case_name}_*.nii.gz"))
+    
+    if len(nii_files) <= 1:
+        return nii_files  # 只有1个或0个文件，不需要处理
+    
+    # 找到最大的文件
+    largest_file = max(nii_files, key=lambda f: f.stat().st_size)
+    files_to_delete = [f for f in nii_files if f != largest_file]
+    
+    deleted_count = 0
+    for nii_file in files_to_delete:
+        # 删除对应的JSON文件
+        json_file = nii_file.with_suffix('.json')
+        if json_file.exists():
+            json_file.unlink()
+            deleted_count += 1
+        # 删除NIfTI文件
+        nii_file.unlink()
+        deleted_count += 1
+    
+    if deleted_count > 0:
+        print(f"  Removed {deleted_count//2} smaller NIfTI files, kept: {largest_file.name}")
+    
+    return [largest_file]
+
+
 def extract_json_metadata_to_csv(output_dir):
     try:
         print("  Scanning JSON files...")
@@ -534,7 +674,7 @@ def main():
     else:
         root = tk.Tk()
         root.withdraw()
-        selected = filedialog.askdirectory(title="请选择包含ZIP病例的主目录")
+        selected = filedialog.askdirectory(title="请选择包含ZIP病例或DICOM文件夹的主目录")
         if not selected:
             print("未选择目录，程序退出。")
             messagebox.showwarning("提示", "未选择目录，程序将退出")
@@ -551,35 +691,92 @@ def main():
             print("Error: dcm2niix.exe not found!")
             return
     print(f"Using dcm2niix: {dcm2niix_path}")
-    zip_files = list(data_dir.glob("*.zip"))
-    if not zip_files:
-        print("No ZIP files found in the data directory")
-        return
-    print(f"Found {len(zip_files)} ZIP files to process")
-    print("Smart Processing: Will analyze and convert only the main series for each case")
-    print("Each output will be saved in the original ZIP directory's output folder.")
     
-    # 第一步：提取DICOM元数据
-    print(f"\nStep 1: Extracting DICOM metadata from ZIP files...")
-    extract_script_path = base_dir / "src" / "extract_case_metadata_anywhere.py"
-    if extract_script_path.exists():
-        try:
-            import subprocess
-            result = subprocess.run([
-                sys.executable, str(extract_script_path), str(data_dir)
-            ], capture_output=True, text=True, encoding='utf-8')
-            if result.returncode == 0:
-                print("✓ DICOM metadata extraction completed")
-                if result.stdout:
-                    print(f"Output: {result.stdout[-500:]}")  # 显示最后500字符
-            else:
-                print(f"⚠ DICOM metadata extraction failed (return code: {result.returncode})")
-                print(f"STDERR: {result.stderr}")
-                print(f"STDOUT: {result.stdout}")
-        except Exception as e:
-            print(f"⚠ Could not run metadata extraction: {e}")
+    # 检测输入类型：ZIP文件和DICOM文件夹
+    zip_files = list(data_dir.glob("*.zip"))
+    
+    # 查找可能的DICOM文件夹（排除已知的输出目录）
+    dicom_folders = []
+    exclude_dirs = {'output', 'temp_dcm2niix_processing', '.git', '__pycache__'}
+    for item in data_dir.iterdir():
+        if item.is_dir() and item.name not in exclude_dirs:
+            # 检查文件夹中是否有DICOM文件
+            has_dicom = False
+            try:
+                # 检查标准DICOM扩展名
+                for ext in ['*.dcm', '*.dicom', '*.DCM', '*.DICOM']:
+                    if list(item.rglob(ext)):
+                        has_dicom = True
+                        break
+                
+                # 如果没有标准扩展名，检查前几个文件是否为DICOM
+                if not has_dicom:
+                    all_files = [f for f in item.rglob('*') if f.is_file()][:5]
+                    for file_path in all_files:
+                        try:
+                            pydicom.dcmread(str(file_path), force=True)
+                            has_dicom = True
+                            break
+                        except:
+                            continue
+            except:
+                continue
+            
+            if has_dicom:
+                dicom_folders.append(item)
+    
+    # 显示检测结果
+    total_items = len(zip_files) + len(dicom_folders)
+    if total_items == 0:
+        print("❌ No ZIP files or DICOM folders found in the directory")
+        print("请确保目录中包含：")
+        print("  - ZIP压缩包（包含DICOM文件）")
+        print("  - DICOM文件夹（直接包含DICOM文件）")
+        return
+    
+    print(f"\n📋 检测到的输入文件/文件夹:")
+    if zip_files:
+        print(f"  📦 ZIP文件: {len(zip_files)} 个")
+        for zip_file in zip_files[:3]:  # 最多显示3个
+            print(f"    - {zip_file.name}")
+        if len(zip_files) > 3:
+            print(f"    ... 还有 {len(zip_files)-3} 个")
+    
+    if dicom_folders:
+        print(f"  📁 DICOM文件夹: {len(dicom_folders)} 个")
+        for folder in dicom_folders[:3]:  # 最多显示3个
+            print(f"    - {folder.name}/")
+        if len(dicom_folders) > 3:
+            print(f"    ... 还有 {len(dicom_folders)-3} 个")
+    
+    print(f"\n总计: {total_items} 个待处理项目")
+    print("智能处理模式: 自动分析并转换每个case的主要序列")
+    print("输出保存: 每个项目的output文件夹中")
+    
+    # 第一步：提取DICOM元数据（仅对ZIP文件）
+    if zip_files:
+        print(f"\nStep 1: Extracting DICOM metadata from ZIP files...")
+        extract_script_path = base_dir / "src" / "extract_case_metadata_anywhere.py"
+        if extract_script_path.exists():
+            try:
+                import subprocess
+                result = subprocess.run([
+                    sys.executable, str(extract_script_path), str(data_dir)
+                ], capture_output=True, text=True, encoding='utf-8')
+                if result.returncode == 0:
+                    print("✓ DICOM metadata extraction completed")
+                    if result.stdout:
+                        print(f"Output: {result.stdout[-500:]}")  # 显示最后500字符
+                else:
+                    print(f"⚠ DICOM metadata extraction failed (return code: {result.returncode})")
+                    print(f"STDERR: {result.stderr}")
+                    print(f"STDOUT: {result.stdout}")
+            except Exception as e:
+                print(f"⚠ Could not run metadata extraction: {e}")
+        else:
+            print("⚠ extract_case_metadata_anywhere.py not found, skipping metadata extraction")
     else:
-        print("⚠ extract_case_metadata_anywhere.py not found, skipping metadata extraction")
+        print(f"\nStep 1: No ZIP files found, skipping metadata extraction")
         
     # 检查是否生成了元数据文件
     metadata_files = list(data_dir.glob("*metadata*.csv"))
@@ -597,8 +794,13 @@ def main():
         all_results = []
         all_json_files = []
         
-        for i, zip_file in enumerate(zip_files, 1):
-            print(f"\n[{i}/{len(zip_files)}] Processing {zip_file.name}...")
+        # 处理所有项目的计数器
+        current_item = 0
+        
+        # 第2.1步：处理ZIP文件
+        for zip_file in zip_files:
+            current_item += 1
+            print(f"\n[{current_item}/{total_items}] Processing ZIP: {zip_file.name}...")
             
             # 为每个ZIP在其源目录下创建output文件夹
             zip_output_dir = zip_file.parent / "output"
@@ -614,6 +816,25 @@ def main():
                 all_json_files.extend(json_files)
                 print(f"  ✓ Output saved to: {zip_output_dir}")
         
+        # 第2.2步：处理DICOM文件夹
+        for dicom_folder in dicom_folders:
+            current_item += 1
+            print(f"\n[{current_item}/{total_items}] Processing DICOM folder: {dicom_folder.name}/...")
+            
+            # 为每个DICOM文件夹在其父目录下创建output文件夹
+            folder_output_dir = dicom_folder.parent / "output"
+            folder_output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 转换并收集结果
+            result = process_dicom_folder_to_nifti_smart(dicom_folder, folder_output_dir, dcm2niix_path)
+            all_results.append(result)
+            
+            # 收集生成的JSON文件用于汇总
+            if result['success']:
+                json_files = list(folder_output_dir.glob(f"{dicom_folder.name}_*.json"))
+                all_json_files.extend(json_files)
+                print(f"  ✓ Output saved to: {folder_output_dir}")
+        
         # 第三步：生成汇总报告和统计
         successful = [r for r in all_results if r['success']]
         failed = [r for r in all_results if not r['success']]
@@ -621,10 +842,12 @@ def main():
         print(f"\n{'='*60}")
         print(f"CONVERSION SUMMARY")
         print(f"{'='*60}")
-        print(f"Total ZIP files: {len(zip_files)}")
+        print(f"Total items processed: {total_items}")
+        print(f"  - ZIP files: {len(zip_files)}")
+        print(f"  - DICOM folders: {len(dicom_folders)}")
         print(f"Successfully converted: {len(successful)}")
         print(f"Failed: {len(failed)}")
-        print(f"Success rate: {len(successful)/len(zip_files)*100:.1f}%")
+        print(f"Success rate: {len(successful)/total_items*100:.1f}%")
         
         # 错误分类统计
         if failed:
@@ -636,6 +859,9 @@ def main():
             error_types = defaultdict(list)
             for f in failed:
                 error_msg = f.get('error', 'Unknown error')
+                # 获取文件/文件夹名称
+                case_name = f.get('zip_file') or f.get('dicom_folder', 'Unknown')
+                
                 # 简化错误类型
                 if 'No valid DICOM' in error_msg or 'No suitable series' in error_msg:
                     error_type = 'DICOM文件问题'
@@ -645,7 +871,7 @@ def main():
                     error_type = 'ZIP解压失败'
                 else:
                     error_type = '其他错误'
-                error_types[error_type].append(f['zip_file'])
+                error_types[error_type].append(case_name)
             
             print(f"\n按错误类型分类:")
             for error_type, cases in sorted(error_types.items(), key=lambda x: len(x[1]), reverse=True):
@@ -657,22 +883,28 @@ def main():
             
             print(f"\n详细错误信息:")
             for f in failed:
-                print(f"  ✗ {f['zip_file']}")
+                case_name = f.get('zip_file') or f.get('dicom_folder', 'Unknown')
+                case_type = '📦ZIP' if 'zip_file' in f else '📁文件夹'
+                print(f"  ✗ {case_type}: {case_name}")
                 print(f"    错误: {f['error']}")
             
             # 保存失败case列表到文件
+            summary_output_dir = data_dir / "output"
+            summary_output_dir.mkdir(parents=True, exist_ok=True)
             failed_list_path = summary_output_dir / f"failed_cases_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             with open(failed_list_path, 'w', encoding='utf-8') as f:
                 f.write("# 转换失败的case列表\n")
                 f.write(f"# 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"# 总失败数: {len(failed)}\n\n")
+                f.write(f"# 总失败数: {len(failed)} (ZIP文件: {len([r for r in failed if 'zip_file' in r])}, DICOM文件夹: {len([r for r in failed if 'dicom_folder' in r])})\n\n")
                 for error_type, cases in sorted(error_types.items(), key=lambda x: len(x[1]), reverse=True):
                     f.write(f"\n## {error_type} ({len(cases)} cases)\n")
                     for case in cases:
                         f.write(f"{case}\n")
                 f.write(f"\n## 详细错误信息\n")
                 for fail in failed:
-                    f.write(f"\n{fail['zip_file']}: {fail['error']}\n")
+                    case_name = fail.get('zip_file') or fail.get('dicom_folder', 'Unknown')
+                    case_type = 'ZIP' if 'zip_file' in fail else 'DICOM文件夹'
+                    f.write(f"\n[{case_type}] {case_name}: {fail['error']}\n")
             print(f"\n✓ 失败case列表已保存: {failed_list_path.name}")
         
         # 第四步：生成汇总CSV（保存到选择目录的output文件夹）
@@ -693,7 +925,11 @@ def main():
         print(f"✓ Detailed report: {summary_report.name}")
         
         print(f"\n✅ Processing complete!")
-        print(f"📁 Individual files: Check each ZIP's directory output folder")
+        print(f"📁 Individual outputs:")
+        if zip_files:
+            print(f"   - ZIP files: Check each ZIP's directory output folder")
+        if dicom_folders:
+            print(f"   - DICOM folders: Check each folder's parent directory output folder")
         print(f"📄 Summary files saved to: {summary_output_dir}")
 
 if __name__ == "__main__":
