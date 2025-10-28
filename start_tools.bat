@@ -2,6 +2,13 @@
 chcp 65001 >nul
 :: Ensure Python and console use UTF-8 on target machines
 set PYTHONUTF8=1
+:: Prefer bundled python if present (portable distribution)
+set PYPATH=python
+if exist "%~dp0python\python.exe" (
+	set PYPATH=%~dp0python\python.exe
+) else if exist "%~dp0python\pythonw.exe" (
+	set PYPATH=%~dp0python\pythonw.exe
+)
 title DCM-Nii 医学影像处理工具集
 
 echo.
@@ -34,25 +41,25 @@ goto start
 :convert_5mm
 echo.
 echo 启动 DICOM转换工具 (5mm切片过滤)...
-python -X utf8 src/dcm2niix_batch_convert_anywhere_5mm.py
+"%PYPATH%" -X utf8 src/dcm2niix_batch_convert_anywhere_5mm.py
 goto end
 
 :convert_max
 echo.
 echo 启动 DICOM转换工具 (最大层数优先)...
-python -X utf8 src/dcm2niix_batch_convert_max_layers.py
+"%PYPATH%" -X utf8 src/dcm2niix_batch_convert_max_layers.py
 goto end
 
 :deidentify
 echo.
 echo 启动 DICOM脱敏工具...
-python -X utf8 src/dicom_deidentify_universal.py
+"%PYPATH%" -X utf8 src/dicom_deidentify_universal.py
 goto end
 
 :metadata
 echo.
 echo 启动 元数据提取工具...
-python -X utf8 src/extract_case_metadata_anywhere.py
+"%PYPATH%" -X utf8 src/extract_case_metadata_anywhere.py
 goto end
 
 :help
