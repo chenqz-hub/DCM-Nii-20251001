@@ -241,7 +241,8 @@ goto end
 :metadata
 echo.
 echo Launching Metadata Extraction Tool...
-"%PYTHON_HOME%\python.exe" src\extract_case_metadata_anywhere.py
+echo Using default data directory: %~dp0data
+"%PYTHON_HOME%\python.exe" src\extract_case_metadata_anywhere.py "%~dp0data"
 goto end
 
 :help
@@ -287,8 +288,8 @@ pause
 goto start
 "@
 
-$PortableStartBat | Out-File -FilePath (Join-Path $PortableDir "Start_DCM-Nii.bat") -Encoding Default
-Write-Host "  [OK] Launcher created" -ForegroundColor Green
+$PortableStartBat | Set-Content -Path (Join-Path $PortableDir "Start_DCM-Nii.bat") -Encoding UTF8
+Write-Host "  [OK] Launcher created (UTF-8)" -ForegroundColor Green
 
 Write-Host "`n[8/8] Compressing portable package..." -ForegroundColor Yellow
 Write-Host "  This may take several minutes... (~180MB)" -ForegroundColor Gray
