@@ -38,6 +38,20 @@ def convert_dicom_value(value):
     else:
         return str(value)
 
+
+def is_metadata_meaningful(metadata):
+    """判断提取到的metadata是否有足够信息
+
+    Consider PatientID, PatientName, StudyDate as indicators of meaningful metadata.
+    """
+    if not metadata:
+        return False
+    for key in ('PatientID', 'PatientName', 'StudyDate'):
+        val = metadata.get(key, None)
+        if val and val != 'Unknown' and str(val).strip() != '':
+            return True
+    return False
+
 def extract_dicom_metadata(dcm_dataset):
     """从DICOM数据集提取元数据"""
     try:
@@ -94,22 +108,29 @@ def process_zip_file_fast(zip_path):
                     # 直接从ZIP中读取文件到内存
                     with zip_ref.open(file_info) as file:
                         file_bytes = file.read()
-                        
+
                     # 尝试作为DICOM文件读取
                     dcm = pydicom.dcmread(io.BytesIO(file_bytes), force=True)
                     dicom_count += 1
-                    
-                    # 只提取第一个有效DICOM的元数据
-                    if metadata is None:
-                        metadata = extract_dicom_metadata(dcm)
-                        if metadata:
-                            metadata['ZipFileName'] = zip_name
-                    
-                    # 找到第一个有效DICOM后就可以停止（除非你想统计所有DICOM数量）
-                    # 为了速度，我们只读第一个
-                    if metadata and dicom_count >= 1:
+
+                    # 尝试提取元数据并检查是否有意义
+                    candidate = extract_dicom_metadata(dcm)
+                    if candidate:
+                        candidate['ZipFileName'] = zip_name
+                        # 如果这个candidate包含有意义字段，则接受并停止
+                        if is_metadata_meaningful(candidate):
+                            metadata = candidate
+                            break
+                        # 否则，如果还没有metadata，则暂存（如果后面没有更好内容就用它）
+                        if metadata is None:
+                            metadata = candidate
+
+                    # 为了性能，我们最多检查前N个文件
+                    # 如果ZIP里非常大，避免遍历全部文件
+                    MAX_CHECK = 50
+                    if dicom_count >= MAX_CHECK and metadata:
                         break
-                        
+
                 except Exception:
                     # 不是有效的DICOM文件，跳过
                     continue
@@ -152,17 +173,21 @@ def process_directory(dir_path):
                 # 读取DICOM文件
                 dcm = pydicom.dcmread(str(file_path), force=True)
                 dicom_count += 1
-                
-                # 只提取第一个有效DICOM的元数据
-                if metadata is None:
-                    metadata = extract_dicom_metadata(dcm)
-                    if metadata:
-                        metadata['ZipFileName'] = dir_name
-                
-                # 找到第一个有效DICOM后就可以停止
-                if metadata and dicom_count >= 1:
+
+                candidate = extract_dicom_metadata(dcm)
+                if candidate:
+                    candidate['ZipFileName'] = dir_name
+                    if is_metadata_meaningful(candidate):
+                        metadata = candidate
+                        break
+                    if metadata is None:
+                        metadata = candidate
+
+                # 限制检查文件数以控制时间
+                MAX_CHECK = 50
+                if dicom_count >= MAX_CHECK and metadata:
                     break
-                    
+
             except Exception:
                 # 不是有效的DICOM文件，跳过
                 continue

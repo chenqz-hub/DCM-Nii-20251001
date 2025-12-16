@@ -588,10 +588,20 @@ def main():
     
     for case_label, dicom_files in case_files.items():
         case_new_id = case_new_id_map[case_label]
+        
+        # 从第一个DICOM文件中提取患者姓名用于文件夹命名
+        patient_name = "Unknown"
+        try:
+            ds = pydicom.dcmread(dicom_files[0], stop_before_pixels=True)
+            patient_name = str(getattr(ds, 'PatientName', 'Unknown'))
+        except Exception:
+            patient_name = "Unknown"
+        
         print(f"\n处理 {case_label} -> {case_new_id} ({len(dicom_files)} 个文件)")
         
-        # 创建case专属输出目录
-        safe_case_name = sanitize_case_label(case_label)
+        # 创建case专属输出目录 - 使用PatientID、患者姓名和文件数量作为文件夹名
+        file_count = len(dicom_files)
+        safe_case_name = sanitize_case_label(f"{case_new_id}_{patient_name}_{file_count}")
         case_output_dir = os.path.join(output_base, safe_case_name)
         os.makedirs(case_output_dir, exist_ok=True)
         
